@@ -2,17 +2,17 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "autogen-agentchat>=0.4",
-#     "autogen-ext[openai]>=0.4",
+#     "agent-framework-core>=1.0.0b260106",
+#     "openai>=1.0.0",
 #     "httpx>=0.27",
 #     "pydantic>=2.0",
 # ]
 # ///
 """
-Adverse Media Screening Agent using Microsoft AutoGen.
+Adverse Media Screening Agent using Microsoft Agent Framework.
 
 A multi-agent system that screens entities for adverse media mentions.
-Demonstrates AutoGen's multi-agent orchestration capabilities.
+Demonstrates Microsoft Agent Framework's multi-agent orchestration capabilities.
 
 Usage:
     uv run main.py "Elizabeth Holmes" --type person
@@ -29,10 +29,8 @@ from enum import Enum
 from typing import Any
 
 import httpx
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.messages import TextMessage
-from autogen_core import CancellationToken
-from autogen_ext.models.openai import OpenAIChatCompletionClient
+from agent_framework import ChatAgent
+from agent_framework.openai import OpenAIChatClient
 from pydantic import BaseModel, Field
 
 
@@ -262,32 +260,31 @@ The detailed report should be suitable for compliance review and audit purposes.
 # Agent Execution
 # =============================================================================
 
-def create_model_client() -> OpenAIChatCompletionClient:
+def create_model_client() -> OpenAIChatClient:
     """Create OpenRouter-compatible model client."""
-    return OpenAIChatCompletionClient(
-        model=get_env("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
+    return OpenAIChatClient(
+        model_id=get_env("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
         api_key=get_env("OPENROUTER_API_KEY"),
         base_url="https://openrouter.ai/api/v1",
-        model_info={
-            "vision": False,
-            "function_calling": True,
-            "json_output": True,
-            "family": "claude",
-            "structured_output": True,
-        },
     )
 
 
 async def run_agent(
-    agent: AssistantAgent,
+    agent: ChatAgent,
     prompt: str,
 ) -> str:
     """Run an agent and return its response."""
-    response = await agent.on_messages(
-        [TextMessage(content=prompt, source="orchestrator")],
-        CancellationToken(),
-    )
-    return response.chat_message.content
+    response_text = ""
+    async for event in agent.run_stream(prompt):
+        # Accumulate text from streaming response
+        if hasattr(event, 'text') and event.text:
+            response_text += event.text
+        elif hasattr(event, 'data') and hasattr(event.data, 'text'):
+            if isinstance(event.data.text, str):
+                response_text += event.data.text
+            elif hasattr(event.data.text, 'text') and event.data.text.text:
+                response_text += event.data.text.text
+    return response_text
 
 
 def parse_json_response(response: str) -> dict[str, Any]:
@@ -344,28 +341,28 @@ async def run_screening(
     model_client = create_model_client()
 
     # Create agents
-    research_agent = AssistantAgent(
+    research_agent = ChatAgent(
+        chat_client=model_client,
         name="ResearchAgent",
-        model_client=model_client,
-        system_message=RESEARCH_SYSTEM_PROMPT,
+        instructions=RESEARCH_SYSTEM_PROMPT,
     )
 
-    analysis_agent = AssistantAgent(
+    analysis_agent = ChatAgent(
+        chat_client=model_client,
         name="AnalysisAgent",
-        model_client=model_client,
-        system_message=ANALYSIS_SYSTEM_PROMPT,
+        instructions=ANALYSIS_SYSTEM_PROMPT,
     )
 
-    risk_agent = AssistantAgent(
+    risk_agent = ChatAgent(
+        chat_client=model_client,
         name="RiskAgent",
-        model_client=model_client,
-        system_message=RISK_SYSTEM_PROMPT,
+        instructions=RISK_SYSTEM_PROMPT,
     )
 
-    report_agent = AssistantAgent(
+    report_agent = ChatAgent(
+        chat_client=model_client,
         name="ReportAgent",
-        model_client=model_client,
-        system_message=REPORT_SYSTEM_PROMPT,
+        instructions=REPORT_SYSTEM_PROMPT,
     )
 
     # Research loop
@@ -541,7 +538,7 @@ Research Iterations: {state.research_iterations}"""
 def cli():
     """Command-line interface."""
     parser = argparse.ArgumentParser(
-        description="Adverse Media Screening using AutoGen multi-agent framework"
+        description="Adverse Media Screening using Microsoft Agent Framework"
     )
     parser.add_argument(
         "entity",

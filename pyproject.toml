@@ -1,11 +1,11 @@
 [project]
 name = "adverse-media-agent-autogen"
 version = "0.1.0"
-description = "Adverse media screening using Microsoft AutoGen multi-agent framework"
+description = "Adverse media screening using Microsoft Agent Framework"
 requires-python = ">=3.11"
 dependencies = [
-    "autogen-agentchat>=0.4",
-    "autogen-ext[openai]>=0.4",
+    "agent-framework-core>=1.0.0b260106",
+    "openai>=1.0.0",
     "httpx>=0.27",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
