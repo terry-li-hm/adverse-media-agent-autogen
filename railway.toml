@@ -1,0 +1,11 @@
+[build]
+builder = "nixpacks"
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["python311"]
+
+[build.nixpacksPlan.phases.install]
+cmds = ["pip install --pre -r requirements.txt"]
+
+[deploy]
+startCommand = "python main.py"
